@@ -15,7 +15,7 @@ E = Encoding()
 # To create propositions, create classes for them first, annotated with "@proposition" and the Encoding
 
 # TOP RIGHT IS ORIGIN, x increases to the right, y increases down
-SIZE = 5
+SIZE = 4
 COLS = ['red', 'green', 'blue', 'yellow', 'pink']
 
 @proposition(E)
@@ -48,10 +48,10 @@ class EndpointPropn:
         return f'ENDPOINT: position {self.loc}, color {self.col}'
 
 # Dict: Point -> List[EndpointPropn]
-endpoints_by_location = dict()
+endpoints_by_location = dict() #list of all colour endpoint props
 
 # Dict: Col -> List[EndpointPropn]
-endpoints_by_col = {col: list() for col in COLS}
+endpoints_by_col = {col: list() for col in COLS} #list of all enpoints of a single colour
 
 for x in range(SIZE):
     for y in range(SIZE):
@@ -70,13 +70,11 @@ class LineSegmentPropn:
     def __init__(self, line_segment: LineSegment, col):
         
         if line_segment.manhattan_distance() != 1:
-            raise ValueError(f'Line segment is not valid! The endpoints must be adjacent (manhattan distance of 1)')
-        if not line_segment.in_bounds(SIZE, SIZE):
-            raise ValueError(f'Line segment {line_segment} is not in bounds.')
+            raise ValueError(f'Line segment is not valid! The endpoint')
         
         self.line_segment = line_segment
         self.col = col
-
+        
     def __repr__(self):
         return f'LINE SEGMENT: line segment {self.line_segment}, col {self.col}'
 
@@ -111,7 +109,21 @@ for x in range(SIZE):
 # Every tile must have exactly one color
 for pt in fill_by_point.keys():
     constraint.add_exactly_one(E, *(fill_by_point[pt]))
-    
+
+#An endpoint at (x,y) must have the same colour as the cell where it is located.​
+# If there is an endpoint at (x,y), (x,y) is filled with that endpoint's colour
+for pt in endpoints_by_location.keys():
+    for ep_prop, fill_prop in zip(endpoints_by_location[pt], fill_by_point[pt]):
+        E.add_constraint(ep_prop >>fill_prop)
+
+#Exactly 1 ep per colour
+for col in COLS:
+    constraint.add_exactly_one(E, *endpoints_by_col[col])
+
+#There can’t be two line segments of different colors connecting the same two cells.​
+for ls in line_segment_propns_by_line_segment.keys():
+    constraint.add_at_most_one(E, *line_segment_propns_by_line_segment[ls] )
+
 
 
 # Build an example full theory for your setting and return it.
