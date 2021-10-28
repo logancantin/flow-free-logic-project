@@ -15,7 +15,7 @@ E = Encoding()
 # To create propositions, create classes for them first, annotated with "@proposition" and the Encoding
 
 # TOP RIGHT IS ORIGIN, x increases to the right, y increases down
-SIZE = 4
+SIZE = 5
 COLS = ['red', 'green', 'blue', 'yellow', 'pink']
 
 @proposition(E)
@@ -144,6 +144,12 @@ def example_theory():
 
     return E
 
+ #VISUALIZATION 
+  # make a grid 
+w, h = SIZE, SIZE
+grid = [ ['x' for x in range(w)] for y in range(h)]
+
+
 
 if __name__ == "__main__":
 
@@ -170,4 +176,6 @@ if __name__ == "__main__":
     #print("# Solutions: %d" % count_solutions(T))
     #print("   Solution: %s" % T.solve())
     pprint.pprint(T.solve())
+
+    pprint.pprint(grid)
 
