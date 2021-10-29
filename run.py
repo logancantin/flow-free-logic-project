@@ -5,6 +5,7 @@ import pprint
 # Project imports
 from utils import Point, LineSegment
 
+
 # Third party imports
 from bauhaus import Encoding, proposition, constraint
 from bauhaus.utils import count_solutions, likelihood
@@ -149,6 +150,14 @@ def example_theory():
 w, h = SIZE, SIZE
 grid = [ ['x' for x in range(w)] for y in range(h)]
 
+for x in grid:
+    for y in grid:
+        for col in COLS:
+          #  if colour is at point (x,y), then grid[x][y] = colour
+          # How to get colour of a point?
+            pass
+    pass
+
 
 
 if __name__ == "__main__":
@@ -175,7 +184,30 @@ if __name__ == "__main__":
     print("\nSatisfiable: %s" % T.satisfiable())
     #print("# Solutions: %d" % count_solutions(T))
     #print("   Solution: %s" % T.solve())
-    pprint.pprint(T.solve())
+    
+    solved = T.solve()
+    print(type(solved))
+    pprint.pprint(solved)
+    for f in solved.keys():
+        if  "FilledPropn" in (str(type(f))): #repr(f) contains "FilledPropn"
+            if (solved[f]):
+                col = f.col
+                x = f.loc.x
+                y = f.loc.y
+                grid[x][y] = col[0].lower()
+
+        elif  "EndpointPropn" in (str(type(f))): #repr(ep) contains "endpoint"
+            if (solved[f]):
+                col = f.col
+                x = f.loc.x
+                y = f.loc.y
+                grid[x][y] = col[0].upper()+"E"
+                
+    
+        
+        #x = ep.loc.x
+        #y = ep.loc.y
+        #grid[x][y] = "ep"
 
     pprint.pprint(grid)
 
