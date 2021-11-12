@@ -111,6 +111,7 @@ for x in range(SIZE):
 for pt in fill_by_point.keys():
     constraint.add_exactly_one(E, *(fill_by_point[pt]))
 
+#comment
 
 #An endpoint at (x,y) must have the same colour as the cell where it is located.​
 # If there is an endpoint at (x,y), (x,y) is filled with that endpoint's colour
