@@ -1,3 +1,27 @@
+from itertools import combinations
+from functools import reduce
+from pprint import pprint as pp
+
+def exactly_k_contraint(k: int, *propns):
+    '''Returns a list of constraints where each of the contraints has exaclty k
+    of the propositions set to true.'''
+
+    constraints = []
+
+    # Iterate over all possible k combinations from propns
+    for true_propns in combinations(propns, k):
+
+        # Create a list of the negated propns (the ones that are not true)
+        false_propns = [~x for x in propns if x not in true_propns]
+
+        # Put the lists together
+        all_propns = [*true_propns, *false_propns]
+
+        # "and" all of the propositions together and append to the list of contraints
+        constraints.append(reduce(lambda x, y: x & y, all_propns))
+    
+    # "Or" together all constraints
+    return reduce(lambda x, y: x | y, constraints)
 
 class Point:
     

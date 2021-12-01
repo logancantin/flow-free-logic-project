@@ -1,9 +1,10 @@
 
 # Native imports
 import pprint
+from functools import reduce
 
 # Project imports
-from utils import Point, LineSegment
+from utils import Point, LineSegment, exactly_k_contraint
 
 
 # Third party imports
@@ -18,6 +19,7 @@ E = Encoding()
 # TOP RIGHT IS ORIGIN, x increases to the right, y increases down
 SIZE = 5
 COLS = ['red', 'green', 'blue', 'yellow', 'pink']
+COLMAP = {'R':'red', 'G':'green', 'B':'blue', 'Y':'yellow', 'P':'pink'}
 
 @proposition(E)
 class FilledPropn:
@@ -83,13 +85,7 @@ class LineSegmentPropn:
 line_segment_propns_by_line_segment = dict()
 
 # Dict: Point -> List[LineSegmentPropn]
-line_segment_propns_by_point = dict()
-
-def update_line_segment_propns_by_point(loc, propns):
-    if loc not in line_segment_propns_by_point.keys():
-        line_segment_propns_by_point[loc] = propns.copy()
-    else:
-        line_segment_propns_by_point[loc].append(propns)
+line_segment_propns_by_point = {Point(0, 0):[]}
 
 for x in range(SIZE):
     for y in range(SIZE):
@@ -101,8 +97,11 @@ for x in range(SIZE):
                 continue
             propns = [LineSegmentPropn(ls, col) for col in COLS]
             line_segment_propns_by_line_segment[ls] = propns
-            update_line_segment_propns_by_point(loc1, propns)
-            update_line_segment_propns_by_point(loc2, propns)
+            line_segment_propns_by_point[loc1].extend(propns)
+            if loc2 in line_segment_propns_by_point.keys():
+                line_segment_propns_by_point[loc2].extend(propns)
+            else:
+                line_segment_propns_by_point[loc2] = list(propns)
 
 
 # CONSTRAINT
@@ -111,22 +110,46 @@ for x in range(SIZE):
 for pt in fill_by_point.keys():
     constraint.add_exactly_one(E, *(fill_by_point[pt]))
 
-#comment
-
 #An endpoint at (x,y) must have the same colour as the cell where it is located.​
 # If there is an endpoint at (x,y), (x,y) is filled with that endpoint's colour
 for pt in endpoints_by_location.keys():
     for ep_prop, fill_prop in zip(endpoints_by_location[pt], fill_by_point[pt]):
         E.add_constraint(ep_prop >>fill_prop)
 
-#Exactly 1 ep per colour
+
+#Exactly 2 endpoints per colour
 for col in COLS:
-    constraint.add_exactly_one(E, *endpoints_by_col[col])
+    E.add_constraint(exactly_k_contraint(2, *endpoints_by_col[col]))
 
-#There can’t be two line segments of different colors connecting the same two cells.​
-for ls in line_segment_propns_by_line_segment.keys():
-    constraint.add_at_most_one(E, *line_segment_propns_by_line_segment[ls] )
 
+endpoint_at_location = {
+    Point(x, y): reduce(lambda x, y: x | y, endpoints_by_location[Point(x, y)])
+    for x in range(SIZE)
+    for y in range(SIZE)
+}
+
+
+#There must be exactly one line segment coming out of an endpoint
+for pt in line_segment_propns_by_point.keys():
+    E.add_constraint(endpoint_at_location[pt] >> exactly_k_contraint(1, *line_segment_propns_by_point[pt]))
+
+# There must be exactly two line segments coming out of an endpoint
+for pt in line_segment_propns_by_point.keys():
+    E.add_constraint(~endpoint_at_location[pt] >> exactly_k_contraint(2, *line_segment_propns_by_point[pt]))
+
+# A line segment on a location implies that the cells its on top of are filled with the same colour
+for x in range(SIZE):
+    for y in range(SIZE):
+        loc1 = Point(x, y)
+
+        for loc2 in [Point(x + 1, y), Point(x, y + 1)]:
+            if not loc2.in_bounds(SIZE, SIZE):
+                continue
+            ls = LineSegment(loc1, loc2)
+            
+            for ls_propn, fill1_propn, fill2_propn in zip(
+                    line_segment_propns_by_line_segment[ls], fill_by_point[loc1], fill_by_point[loc2]):
+                E.add_constraint(ls_propn >> (fill1_propn & fill2_propn))
 
 
 # Build an example full theory for your setting and return it.
@@ -147,6 +170,17 @@ def example_theory():
 
     return E
 
+def load_board(board='boards/level1.txt'):
+
+    with open(board, 'r') as f:
+        board = f.readlines()[:5]
+    for y, line in enumerate(board):
+        for x, c in enumerate(line[:5]):
+            if c != '.':
+                ep_propn = endpoints_by_location[Point(x, y)][COLS.index(COLMAP[c])]
+                E.add_constraint(ep_propn)
+                
+
  #VISUALIZATION 
   # make a grid 
 w, h = SIZE, SIZE
@@ -164,26 +198,15 @@ for x in grid:
 
 if __name__ == "__main__":
 
-    '''
-    T = example_theory()
-    # Don't compile until you're finished adding all your constraints!
-    T = T.compile()
-    # After compilation (and only after), you can check some of the properties
-    # of your model:
-    print("\nSatisfiable: %s" % T.satisfiable())
-    print("# Solutions: %d" % count_solutions(T))
-    print("   Solution: %s" % T.solve())
+    from sys import argv
 
-    print("\nVariable likelihoods:")
-    for v,vn in zip([a,b,c,x,y,z], 'abcxyz'):
-        # Ensure that you only send these functions NNF formulas
-        # Literals are compiled to NNF here
-        print(" %s: %.2f" % (vn, likelihood(T, v)))
-    print()
-    '''
+    if len(argv) > 1:
+        load_board(argv[1])
+    else:
+        load_board()
 
     T = E.compile()
-    print("\nSatisfiable: %s" % T.satisfiable())
+    #print("\nSatisfiable: %s" % T.satisfiable())
     #print("# Solutions: %d" % count_solutions(T))
     #print("   Solution: %s" % T.solve())
     
@@ -196,15 +219,16 @@ if __name__ == "__main__":
                 col = f.col
                 x = f.loc.x
                 y = f.loc.y
-                grid[x][y] = col[0].lower()
-
-        elif  "EndpointPropn" in (str(type(f))): #repr(ep) contains "endpoint"
+                grid[y][x] = col[0].lower() if grid[y][x] == 'x' else grid[y][x] + col[0].lower()
+    
+    for f in solved.keys():
+        if  "EndpointPropn" in (str(type(f))): #repr(ep) contains "endpoint"
             if (solved[f]):
                 col = f.col
                 x = f.loc.x
                 y = f.loc.y
-                grid[x][y] = col[0].upper()+"E"
-                
+                grid[y][x] += col[0].upper()
+               
     
         
         #x = ep.loc.x
