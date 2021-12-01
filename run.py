@@ -268,14 +268,25 @@ if __name__ == "__main__":
     print()
     '''
 
-    T = E.compile()
-    print("\nSatisfiable: %s" % T.satisfiable())
-    #print("# Solutions: %d" % count_solutions(T))
-    #print("   Solution: %s" % T.solve())
-    
-    solved = T.solve()
-    print(type(solved))
-    pprint.pprint(solved)
+    import sys
+    print(sys.argv)
+
+    if len(sys.argv) == 1:
+
+        T = E.compile()
+        print("\nSatisfiable: %s" % T.satisfiable())
+        #print("# Solutions: %d" % count_solutions(T))
+        #print("   Solution: %s" % T.solve())
+        
+        solved = T.solve()
+        print(type(solved))
+        pprint.pprint(solved)
+    else:
+        print("loaded")
+        with open(sys.argv[1], 'rb') as f:
+            import dill
+            solved = dill.load(f)
+
     for f in solved.keys():
         if  "LineSegmentPropn" in (str(type(f))): #repr(f) contains "FilledPropn"
             if (solved[f]):
