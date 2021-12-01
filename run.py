@@ -10,6 +10,9 @@ from utils import Point, LineSegment
 from bauhaus import Encoding, proposition, constraint
 from bauhaus.utils import count_solutions, likelihood
 
+#Visualization import
+import turtle
+
 # Encoding that will store all of your constraints
 E = Encoding()
 
@@ -17,7 +20,7 @@ E = Encoding()
 
 # TOP RIGHT IS ORIGIN, x increases to the right, y increases down
 SIZE = 5
-COLS = ['red', 'green', 'blue', 'yellow', 'pink']
+COLS = ['red', 'green', 'blue', 'yellow', 'orange']
 
 @proposition(E)
 class FilledPropn:
@@ -160,7 +163,90 @@ for x in grid:
             pass
     pass
 
+def draw_board(size, arr):
 
+    #SCREEN SET UP
+    
+    grid_w = 600
+    cell_w = grid_w /size #width of each cell
+
+    turtle.screensize(canvwidth=(grid_w), canvheight=(grid_w), bg="black")
+    turtle.title("Flow Logic Project")
+    turtle.speed(0)
+    
+    tr = turtle.Turtle()
+    tr.ht()
+    X_START = -300
+    Y_START = 300
+    tr.speed(0)
+    tr.color("white")
+    tr.penup()
+    tr.goto(X_START, Y_START) #top left corner. 
+    tr.pendown()
+
+    #Draws the edges of the board
+    for i in range (4):
+        tr.forward(cell_w * size)
+        tr.right(90)
+    #Draws the horizontal grid lines
+    for i in range (size):
+        tr.goto(tr.xcor(), tr.ycor()-cell_w)
+        tr.forward(cell_w*size)
+        tr.goto(tr.xcor() - cell_w*size, tr.ycor()) 
+
+    #resets the turtle
+    tr.goto(tr.xcor(), tr.ycor()+cell_w*size)
+    tr.right(90)
+
+    #Draws the vertical grid lines
+    for i in range (size):
+       tr.goto(tr.xcor()+cell_w, tr.ycor())
+       tr.forward(cell_w*size)
+       tr.goto(tr.xcor(), tr.ycor() + cell_w*size) 
+
+    #Reset Turtle position to start drawing propositions
+    tr.penup()
+    tr.goto( (X_START + cell_w/2), (Y_START - cell_w/2))
+    tr.speed(0)
+
+    #Fill the board with the endpoints 
+    for x in range(size):
+        for y in range(size):
+            prop = arr[x][y]
+            if "EndpointPropn" in (str(type(prop))): #repr(ep) contains "endpoint"
+                tr.color(prop.col)
+                tr.pensize(cell_w/3)
+                tr.dot()
+            tr.forward(cell_w)
+        tr.goto((tr.xcor() + cell_w), Y_START - cell_w/2)
+
+    #Reset Turtle position to start drawing line segments
+    tr.penup()
+    tr.goto( (X_START + cell_w/2), (Y_START - cell_w/2))
+    
+    for x in range(size):
+        for y in range(size):
+            prop = arr[x][y]
+            if "LineSegmentPropn" in (str(type(prop))): #repr(ep) contains "endpoint"
+                tr.color(prop.col)
+                tr.pensize(cell_w / 3)
+                
+                xpos = (X_START + cell_w/2) + cell_w * prop.line_segment.p1.x 
+                ypos = (Y_START - cell_w/2) - cell_w * prop.line_segment.p1.y
+                tr.goto(xpos, ypos)
+                tr.pendown()
+                xpos = (X_START + cell_w/2) + cell_w * prop.line_segment.p2.x 
+                ypos = (Y_START - cell_w/2) - cell_w * prop.line_segment.p2.y
+                tr.goto(xpos, ypos)
+                tr.penup()
+            
+        tr.goto((tr.xcor() + cell_w), Y_START - cell_w/2)
+           
+
+    
+    
+
+    turtle.done()
 
 if __name__ == "__main__":
 
@@ -191,25 +277,22 @@ if __name__ == "__main__":
     print(type(solved))
     pprint.pprint(solved)
     for f in solved.keys():
-        if  "FilledPropn" in (str(type(f))): #repr(f) contains "FilledPropn"
+        if  "LineSegmentPropn" in (str(type(f))): #repr(f) contains "FilledPropn"
             if (solved[f]):
                 col = f.col
-                x = f.loc.x
-                y = f.loc.y
-                grid[x][y] = col[0].lower()
+                x = f.line_segment.p2.x
+                y = f.line_segment.p2.y
+                grid[x][y] = f
 
         elif  "EndpointPropn" in (str(type(f))): #repr(ep) contains "endpoint"
             if (solved[f]):
                 col = f.col
                 x = f.loc.x
                 y = f.loc.y
-                grid[x][y] = col[0].upper()+"E"
+                grid[x][y] = f
                 
-    
-        
-        #x = ep.loc.x
-        #y = ep.loc.y
-        #grid[x][y] = "ep"
-
+    print(grid[1][1])
     pprint.pprint(grid)
+
+    draw_board(len(grid), grid)
 
