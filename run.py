@@ -163,7 +163,7 @@ for x in grid:
             pass
     pass
 
-def draw_board(size, arr):
+def draw_board(size, solved):
 
     #SCREEN SET UP
     
@@ -172,7 +172,7 @@ def draw_board(size, arr):
 
     turtle.screensize(canvwidth=(grid_w), canvheight=(grid_w), bg="black")
     turtle.title("Flow Logic Project")
-    turtle.speed(0)
+    turtle.speed(0)    
     
     tr = turtle.Turtle()
     tr.ht()
@@ -183,6 +183,14 @@ def draw_board(size, arr):
     tr.penup()
     tr.goto(X_START, Y_START) #top left corner. 
     tr.pendown()
+
+    # Optimizations
+    turtle.delay(0)
+    tr.ht()
+    
+
+    def t(x, y):
+        return (X_START + cell_w/2) + cell_w * x, (Y_START - cell_w/2) - cell_w * y 
 
     #Draws the edges of the board
     for i in range (4):
@@ -210,42 +218,27 @@ def draw_board(size, arr):
     tr.speed(0)
 
     #Fill the board with the endpoints 
-    for x in range(size):
-        for y in range(size):
-            prop = arr[x][y]
-            if "EndpointPropn" in (str(type(prop))): #repr(ep) contains "endpoint"
-                tr.color(prop.col)
-                tr.pensize(cell_w/3)
-                tr.dot()
-            tr.forward(cell_w)
-        tr.goto((tr.xcor() + cell_w), Y_START - cell_w/2)
+    for prop in solved.keys():
+        if not solved[prop]:
+            continue
+        
+        elif "EndpointPropn" in (str(type(prop))): #repr(ep) contains "endpoint"
+            tr.color(prop.col)
+            tr.goto(*t(prop.loc.x, prop.loc.y))
+            tr.pensize(cell_w/3)
+            tr.dot()
 
-    #Reset Turtle position to start drawing line segments
-    tr.penup()
-    tr.goto( (X_START + cell_w/2), (Y_START - cell_w/2))
-    
-    for x in range(size):
-        for y in range(size):
-            prop = arr[x][y]
-            if "LineSegmentPropn" in (str(type(prop))): #repr(ep) contains "endpoint"
-                tr.color(prop.col)
-                tr.pensize(cell_w / 3)
-                
-                xpos = (X_START + cell_w/2) + cell_w * prop.line_segment.p1.x 
-                ypos = (Y_START - cell_w/2) - cell_w * prop.line_segment.p1.y
-                tr.goto(xpos, ypos)
-                tr.pendown()
-                xpos = (X_START + cell_w/2) + cell_w * prop.line_segment.p2.x 
-                ypos = (Y_START - cell_w/2) - cell_w * prop.line_segment.p2.y
-                tr.goto(xpos, ypos)
-                tr.penup()
+        elif "LineSegmentPropn" in (str(type(prop))): #repr(ep) contains "endpoint"
+            tr.color(prop.col)
+            tr.pensize(cell_w / 3)
+
+            ls = prop.line_segment
             
-        tr.goto((tr.xcor() + cell_w), Y_START - cell_w/2)
-           
-
-    
-    
-
+            tr.goto(*t(ls.p1.x, ls.p1.y))
+            tr.pendown()
+            tr.goto(*t(ls.p2.x, ls.p2.y))
+            tr.penup()
+            
     turtle.done()
 
 if __name__ == "__main__":
@@ -286,24 +279,9 @@ if __name__ == "__main__":
         with open(sys.argv[1], 'rb') as f:
             import dill
             solved = dill.load(f)
-
-    for f in solved.keys():
-        if  "LineSegmentPropn" in (str(type(f))): #repr(f) contains "FilledPropn"
-            if (solved[f]):
-                col = f.col
-                x = f.line_segment.p2.x
-                y = f.line_segment.p2.y
-                grid[x][y] = f
-
-        elif  "EndpointPropn" in (str(type(f))): #repr(ep) contains "endpoint"
-            if (solved[f]):
-                col = f.col
-                x = f.loc.x
-                y = f.loc.y
-                grid[x][y] = f
                 
-    print(grid[1][1])
-    pprint.pprint(grid)
+    #print(grid[1][1])
+    #pprint.pprint(grid)
 
-    draw_board(len(grid), grid)
+    draw_board(SIZE, solved)
 
