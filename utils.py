@@ -149,3 +149,18 @@ def draw_board(size, solved):
             tr.penup()
             
     turtle.done()
+
+def gen_points(size: int):
+    for x in range(size):
+        for y in range(size):
+            yield Point(x, y)
+
+def gen_line_segments(size: int):
+    for x in range(size):
+        for y in range(size):
+            loc1 = Point(x, y)
+
+            for loc2 in [Point(x + 1, y), Point(x, y + 1)]:
+                if not loc2.in_bounds(size, size):
+                    continue
+                yield LineSegment(loc1, loc2)

@@ -5,7 +5,7 @@ from functools import reduce
 from sys import argv
 
 # Project imports
-from utils import Point, LineSegment, exactly_k_contraint, draw_board
+from utils import Point, LineSegment, exactly_k_contraint, draw_board, gen_points, gen_line_segments
 
 # Third party imports
 from bauhaus import Encoding, proposition, constraint
@@ -16,7 +16,9 @@ COLMAP = {
     'G':'green',
     'B':'blue',
     'Y':'yellow',
-    'P':'pink'
+    'P':'pink',
+    'O': 'orange',
+    'A': 'aqua'
 }
 
 E = Encoding()
@@ -63,6 +65,17 @@ class LineSegmentPropn:
         
     def __repr__(self):
         return f'LINE SEGMENT: line segment {self.line_segment}, col {self.col}'
+
+@proposition(E)
+class ConnectedPropn:
+    '''Proposition that represents whether a cell is connected to an endpoint by a flow. '''
+
+    def __init__(self, point: Point):
+        self.point = point
+    
+    def __repr__(self):
+        return f'CONNECTED: {self.point} is connected to an endpoint via a flow'
+
 
 def _fill_propns_init(size: int, colors: list[str]):
     """Initializes the FilledPropositions for the given board.
@@ -161,6 +174,27 @@ def _line_segment_propns_init(size: int, colors: list[str]):
                     line_segment_propns_by_point[loc2] = list(propns)
     return line_segment_propns_by_line_segment, line_segment_propns_by_point
   
+def _connected_propns_init(size: int):
+    """Initializes the LineSegmentPropositions for the given board.
+
+    Arguments
+    ---------
+    size : int
+        width / height of the board
+
+    Returns
+    -------
+    dict[Point, ConnectedPropn]
+        Dictionary mapping Points to the ConnectedPropn for that location
+    """
+
+    connected_propns = dict()
+    for x in range(size):
+        for y in range(size):
+            pt = Point(x, y)
+            connected_propns[pt] = ConnectedPropn(pt)
+    return connected_propns
+  
 
 def load_board(board_file='boards/level1.txt'):
     """Loads a board from a board file.
@@ -221,6 +255,7 @@ def load_board(board_file='boards/level1.txt'):
         endpoints_by_col = _endpoint_propns_init(size=size, colors=colors)
     line_segment_propns_by_line_segment, \
         line_segment_propns_by_point = _line_segment_propns_init(size=size, colors=colors)
+    connected_propns = _connected_propns_init(size=size)
 
     # Add constraints given from the boardfile
     for y, line in enumerate(board[:5]):
@@ -261,6 +296,23 @@ def load_board(board_file='boards/level1.txt'):
     }
     for pt in line_segment_propns_by_point.keys():
         E.add_constraint(endpoint_at_location[pt] >> exactly_k_contraint(1, *line_segment_propns_by_point[pt]))
+
+    # Endpoints are connected to an endpoint via a flow
+    for pt in line_segment_propns_by_point.keys():
+        E.add_constraint(endpoint_at_location[pt] >> connected_propns[pt])
+    
+    # If either end of a line segment is connected to an endpoint, then both ends are connected
+    line_segment_at_location = {
+        ls: reduce(lambda x, y: x | y, line_segment_propns_by_line_segment[ls])
+        for ls in gen_line_segments(size=size)
+    }
+    for ls in gen_line_segments(size=size):
+        p1_connected = connected_propns[ls.p1]
+        p2_connected = connected_propns[ls.p2]
+        E.add_constraint((line_segment_at_location[ls] & (p1_connected | p2_connected)) >> (p1_connected & p2_connected))
+
+    # All cells must be connected
+    E.add_constraint(reduce(lambda x, y: x & y, connected_propns.values()))
 
     # There must be exactly two line segments coming out of a non-endpoint cell
     for pt in line_segment_propns_by_point.keys():
