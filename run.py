@@ -2,17 +2,165 @@
 # Native imports
 import pprint
 from functools import reduce
+from sys import argv
 
 # Project imports
-from utils import Point, LineSegment, exactly_k_contraint, \
-    _endpoint_propns_init, _fill_propns_init, _line_segment_propns_init
-from propositions import FilledPropn, EndpointPropn, LineSegmentPropn
+from utils import Point, LineSegment, exactly_k_contraint, draw_board
 
 # Third party imports
 from bauhaus import Encoding, proposition, constraint
 from bauhaus.utils import count_solutions, likelihood
 
-COLMAP = {'R':'red', 'G':'green', 'B':'blue', 'Y':'yellow', 'P':'pink'}
+COLMAP = {
+    'R':'red',
+    'G':'green',
+    'B':'blue',
+    'Y':'yellow',
+    'P':'pink'
+}
+
+E = Encoding()
+
+@proposition(E)
+class FilledPropn:
+    '''Proposition that represents whether or not a cell is filled. '''
+
+    def __init__(self, loc: Point, col):
+        '''Creates a filled proposition for the cell at `loc` of color `col`. '''
+        
+        self.loc = loc
+        self.col = col
+    
+    def __repr__(self):
+        return f'FILLED: position {self.loc}, colour {self.col}'
+
+@proposition(E)
+class EndpointPropn:
+    '''Proposition that represents an endpoint of a flow. '''
+
+    def __init__(self, loc, col):
+        '''Creates an endpoint proposition at location `loc` and of color `col`. '''
+        self.loc = loc
+        self.col = col
+
+    def __repr__(self):
+        return f'ENDPOINT: position {self.loc}, color {self.col}'
+
+
+@proposition(E)
+class LineSegmentPropn:
+    '''Proposition that represents a line segment. '''
+
+    def __init__(self, line_segment: LineSegment, col):
+        '''Creates a line segment proposition between the cells specified by 
+        `line_segment` of color `col`. '''
+        
+        if line_segment.manhattan_distance() != 1:
+            raise ValueError(f'Line segment must have manhattan distance of 1.')
+        
+        self.line_segment = line_segment
+        self.col = col
+        
+    def __repr__(self):
+        return f'LINE SEGMENT: line segment {self.line_segment}, col {self.col}'
+
+def _fill_propns_init(size: int, colors: list[str]):
+    """Initializes the FilledPropositions for the given board.
+
+    Arguments
+    ---------
+    size : int
+        width / height of the board
+    colors : list[str]
+        valid colors for this board
+
+    Returns
+    -------
+    dict[Point, List[FilledPropn]]
+        Returns a dictionary mapping a point (location on the board) to all the
+        filled propositions at that location.
+    """
+
+    fill_by_point = dict()
+    for x in range(size):
+        for y in range(size):
+            loc = Point(x, y)
+            fill_by_point[loc] = [FilledPropn(loc, col) for col in colors]
+    return fill_by_point
+
+def _endpoint_propns_init(size: int, colors: list[str]):
+    """Initializes the EndpointPropositions for the given board.
+
+    Arguments
+    ---------
+    size : int
+        width / height of the board
+    colors : list[str]
+        valid colors for this board
+
+    Returns
+    -------
+    tuple[dict[Point, list[EndpointPropn]], dict[str, list[EndpointPropn]]]
+        Returns a tuple. First object is a dictionary mapping a point on the
+        board to a list of endpoint propositions at that location. Second 
+        object is dictionary mapping a color to all the endpoints of that
+        color.
+    """
+
+    endpoints_by_location = dict() #list of all colour endpoint props
+    endpoints_by_col = {col: list() for col in colors} #list of all enpoints of a single colour
+
+    for x in range(size):
+        for y in range(size):
+            loc = Point(x, y)
+            propns = list()
+            for col in colors:
+                propn = EndpointPropn(loc, col)
+                endpoints_by_col[col].append(propn)
+                propns.append(propn)
+            endpoints_by_location[loc] = propns
+
+    return endpoints_by_location, endpoints_by_col
+
+def _line_segment_propns_init(size: int, colors: list[str]):
+    """Initializes the LineSegmentPropositions for the given board.
+
+    Arguments
+    ---------
+    size : int
+        width / height of the board
+    colors : list[str]
+        valid colors for this board
+
+    Returns
+    -------
+    tuple[dict[LineSegment, list[LineSegmentPropn]], dict[str, list[LineSegmentPropn]]]
+        Returns a tuple. First object is a dictionary mapping a line segment
+        on the board to a list of line segments at the same location. Second 
+        object is dictionary mapping a point to all the endpoints that touch
+        that point.
+    """
+
+    line_segment_propns_by_line_segment = dict()
+    line_segment_propns_by_point = {Point(0, 0):[]}
+
+    for x in range(size):
+        for y in range(size):
+            loc1 = Point(x, y)
+
+            for loc2 in [Point(x + 1, y), Point(x, y + 1)]:
+                ls = LineSegment(loc1, loc2)
+                if not ls.in_bounds(size, size):
+                    continue
+                propns = [LineSegmentPropn(ls, col) for col in colors]
+                line_segment_propns_by_line_segment[ls] = propns
+                line_segment_propns_by_point[loc1].extend(propns)
+                if loc2 in line_segment_propns_by_point.keys():
+                    line_segment_propns_by_point[loc2].extend(propns)
+                else:
+                    line_segment_propns_by_point[loc2] = list(propns)
+    return line_segment_propns_by_line_segment, line_segment_propns_by_point
+  
 
 def load_board(board_file='boards/level1.txt'):
     """Loads a board from a board file.
@@ -74,8 +222,20 @@ def load_board(board_file='boards/level1.txt'):
     line_segment_propns_by_line_segment, \
         line_segment_propns_by_point = _line_segment_propns_init(size=size, colors=colors)
 
-    # Encoding that will store all of the constraints
-    E = Encoding()
+    # Add constraints given from the boardfile
+    for y, line in enumerate(board[:5]):
+        for x, c in enumerate(line[:5]):
+            if c in COLMAP.keys():
+
+                # Find endpoint constraint of this color at this point
+                p = Point(x, y)
+                all_endpoints = endpoints_by_location[p]
+                correct_endpoint = None
+                for ep in all_endpoints:
+                    if ep.col == COLMAP[c]:
+                        correct_endpoint = ep
+                        break
+                E.add_constraint(correct_endpoint)
 
     # Generate the constraints:
     # Every tile must have exactly one color
@@ -86,7 +246,7 @@ def load_board(board_file='boards/level1.txt'):
     # If there is an endpoint at (x,y), (x,y) is filled with that endpoint's colour
     for pt in endpoints_by_location.keys():
         for ep_prop, fill_prop in zip(endpoints_by_location[pt], fill_by_point[pt]):
-            E.add_constraint(ep_prop >>fill_prop)
+            E.add_constraint(ep_prop >> fill_prop)
 
     #Exactly 2 endpoints per colour
     for col in colors:
@@ -120,15 +280,21 @@ def load_board(board_file='boards/level1.txt'):
                         line_segment_propns_by_line_segment[ls], fill_by_point[loc1], fill_by_point[loc2]):
                     E.add_constraint(ls_propn >> (fill1_propn & fill2_propn))
 
-    return E
+    return E, size, colors
 
 if __name__ == "__main__":
 
-    from sys import argv
-
     E, size, colors = load_board() if len(argv) < 2 else load_board(argv[1])
+
+    # Compile and solve the theory
     T = E.compile()
-    
     solved = T.solve()
-    print(solved)
+
+    # Size is 5 since we have restricted boards to 5x5
+    size = 5
+
+    if solved is not None:
+        draw_board(size, solved)
+    else:
+        print("No solution")
 

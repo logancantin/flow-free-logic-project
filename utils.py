@@ -1,7 +1,7 @@
 from itertools import combinations
 from functools import reduce
 from pprint import pprint as pp
-from propositions import LineSegmentPropn, EndpointPropn, FilledPropn
+import turtle
 
 def exactly_k_contraint(k: int, *propns):
     '''Returns a list of constraints where each of the contraints has exaclty k
@@ -71,102 +71,81 @@ class LineSegment:
     def in_bounds(self, max_x, max_y):
         '''Returns true if both endpoints are inside the bounds 0 <= x < max_x and 0 <= y < max_y'''
         return self.p1.in_bounds(max_x, max_y) and self.p2.in_bounds(max_x, max_y)
+
+def draw_board(size, solved):
+
+    #SCREEN SET UP
+    
+    grid_w = 600
+    cell_w = grid_w /size #width of each cell
+
+    turtle.screensize(canvwidth=(grid_w), canvheight=(grid_w), bg="black")
+    turtle.title("Flow Logic Project")
+    turtle.speed(0)    
+    
+    tr = turtle.Turtle()
+    tr.ht()
+    X_START = -300
+    Y_START = 300
+    tr.speed(0)
+    tr.color("white")
+    tr.penup()
+    tr.goto(X_START, Y_START) #top left corner. 
+    tr.pendown()
+
+    # Optimizations
+    turtle.delay(0)
+    tr.ht()
+    
+
+    def t(x, y):
+        return (X_START + cell_w/2) + cell_w * x, (Y_START - cell_w/2) - cell_w * y 
+
+    #Draws the edges of the board
+    for i in range (4):
+        tr.forward(cell_w * size)
+        tr.right(90)
+    #Draws the horizontal grid lines
+    for i in range (size):
+        tr.goto(tr.xcor(), tr.ycor()-cell_w)
+        tr.forward(cell_w*size)
+        tr.goto(tr.xcor() - cell_w*size, tr.ycor()) 
+
+    #resets the turtle
+    tr.goto(tr.xcor(), tr.ycor()+cell_w*size)
+    tr.right(90)
+
+    #Draws the vertical grid lines
+    for i in range (size):
+       tr.goto(tr.xcor()+cell_w, tr.ycor())
+       tr.forward(cell_w*size)
+       tr.goto(tr.xcor(), tr.ycor() + cell_w*size) 
+
+    #Reset Turtle position to start drawing propositions
+    tr.penup()
+    tr.goto( (X_START + cell_w/2), (Y_START - cell_w/2))
+    tr.speed(0)
+
+    #Fill the board with the endpoints 
+    for prop in solved.keys():
+        if not solved[prop]:
+            continue
         
+        elif "EndpointPropn" in (str(type(prop))): #repr(ep) contains "endpoint"
+            tr.color(prop.col)
+            tr.goto(*t(prop.loc.x, prop.loc.y))
+            tr.pensize(cell_w/3)
+            tr.dot()
 
-def _fill_propns_init(size: int, colors: list[str]):
-    """Initializes the FilledPropositions for the given board.
+        elif "LineSegmentPropn" in (str(type(prop))): #repr(ep) contains "endpoint"
+            tr.color(prop.col)
+            tr.pensize(cell_w / 3)
 
-    Arguments
-    ---------
-    size : int
-        width / height of the board
-    colors : list[str]
-        valid colors for this board
-
-    Returns
-    -------
-    dict[Point, List[FilledPropn]]
-        Returns a dictionary mapping a point (location on the board) to all the
-        filled propositions at that location.
-    """
-
-    fill_by_point = dict()
-    for x in range(size):
-        for y in range(size):
-            loc = Point(x, y)
-            fill_by_point[loc] = [FilledPropn(loc, col) for col in colors]
-    return fill_by_point
-
-def _endpoint_propns_init(size: int, colors: List[str]):
-    """Initializes the EndpointPropositions for the given board.
-
-    Arguments
-    ---------
-    size : int
-        width / height of the board
-    colors : list[str]
-        valid colors for this board
-
-    Returns
-    -------
-    tuple[dict[Point, list[EndpointPropn]], dict[str, list[EndpointPropn]]]
-        Returns a tuple. First object is a dictionary mapping a point on the
-        board to a list of endpoint propositions at that location. Second 
-        object is dictionary mapping a color to all the endpoints of that
-        color.
-    """
-
-    endpoints_by_location = dict() #list of all colour endpoint props
-    endpoints_by_col = {col: list() for col in colors} #list of all enpoints of a single colour
-
-    for x in range(size):
-        for y in range(size):
-            loc = Point(x, y)
-            propns = list()
-            for col in colors:
-                propn = EndpointPropn(loc, col)
-                endpoints_by_col[col].append(propn)
-                propns.append(propn)
-            endpoints_by_location[loc] = propns
-
-    return endpoints_by_location, endpoints_by_col
-
-def _line_segment_propns_init(size: int, colors: list[str]):
-    """Initializes the LineSegmentPropositions for the given board.
-
-    Arguments
-    ---------
-    size : int
-        width / height of the board
-    colors : list[str]
-        valid colors for this board
-
-    Returns
-    -------
-    tuple[dict[LineSegment, list[LineSegmentPropn]], dict[str, list[LineSegmentPropn]]]
-        Returns a tuple. First object is a dictionary mapping a line segment
-        on the board to a list of line segments at the same location. Second 
-        object is dictionary mapping a point to all the endpoints that touch
-        that point.
-    """
-
-    line_segment_propns_by_line_segment = dict()
-    line_segment_propns_by_point = {Point(0, 0):[]}
-
-    for x in range(size):
-        for y in range(size):
-            loc1 = Point(x, y)
-
-            for loc2 in [Point(x + 1, y), Point(x, y + 1)]:
-                ls = LineSegment(loc1, loc2)
-                if not ls.in_bounds(size, size):
-                    continue
-                propns = [LineSegmentPropn(ls, col) for col in colors]
-                line_segment_propns_by_line_segment[ls] = propns
-                line_segment_propns_by_point[loc1].extend(propns)
-                if loc2 in line_segment_propns_by_point.keys():
-                    line_segment_propns_by_point[loc2].extend(propns)
-                else:
-                    line_segment_propns_by_point[loc2] = list(propns)
-    return line_segment_propns_by_line_segment, line_segment_propns_by_point
-  
+            ls = prop.line_segment
+            
+            tr.goto(*t(ls.p1.x, ls.p1.y))
+            tr.pendown()
+            tr.goto(*t(ls.p2.x, ls.p2.y))
+            tr.penup()
+            
+    turtle.done()
