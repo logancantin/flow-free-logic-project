@@ -72,7 +72,7 @@ class LineSegment:
         '''Returns true if both endpoints are inside the bounds 0 <= x < max_x and 0 <= y < max_y'''
         return self.p1.in_bounds(max_x, max_y) and self.p2.in_bounds(max_x, max_y)
 
-def draw_board(size, solved):
+def draw_board(size, solved, output_name=None):
 
     #SCREEN SET UP
     
@@ -147,8 +147,12 @@ def draw_board(size, solved):
             tr.pendown()
             tr.goto(*t(ls.p2.x, ls.p2.y))
             tr.penup()
-            
+    
+    if output_name:
+        turtle.getscreen().getcanvas().postscript(file=output_name)
+
     turtle.done()
+
 
 def gen_points(size: int):
     for x in range(size):

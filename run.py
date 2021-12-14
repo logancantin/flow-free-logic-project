@@ -3,6 +3,7 @@
 import pprint
 from functools import reduce
 from sys import argv
+import os
 
 # Project imports
 from utils import Point, LineSegment, exactly_k_contraint, draw_board, gen_points, gen_line_segments
@@ -196,19 +197,18 @@ def _connected_propns_init(size: int):
     return connected_propns
   
 
-def load_board(board_file='boards/level1.txt'):
+def load_board(board_file):
     """Loads a board from a board file.
 
     Arguments
     ---------
-    board_file : Optional[str]
-        path to the board file. If not supplied, loads the default board,
-        boards/level1.txt.
+    board_file : str
+        path to the board file
 
     Returns
     -------
     tuple[Encoding, tuple[int, int], list[str]]
-        tuple containing the encoding, the size of the board (width, height),
+        tuple containing the compiled NNF, the size of the board (side length),
         and the list of colors
     """
 
@@ -233,20 +233,23 @@ def load_board(board_file='boards/level1.txt'):
             exit(1)
         board.append(line)
     height = len(board)
-    size = 5
 
-    if width != 5 or height != 5:
-        print('Only the board size 5x5 is supported. Please supply a 5x5 board.')
+    if width != height:
+        print('Only square boards are supported.')
         exit(1)
+    size = width
     
     # Get all colors that are used in this board
     colors = set()
-    for line in board[:5]:
-        for c in line[:5]:
+    for line in board[:size]:
+        for c in line[:size]:
             if c == '.':
                 continue
             elif c in COLMAP.keys() and COLMAP[c] not in colors:
                 colors.add(COLMAP[c])
+            elif c not in COLMAP.keys():
+                print(f"The letter '{c}' is not a recognized color.")
+                exit(1)
     colors = list(colors)
 
     # Generate the propositions
@@ -258,8 +261,8 @@ def load_board(board_file='boards/level1.txt'):
     connected_propns = _connected_propns_init(size=size)
 
     # Add constraints given from the boardfile
-    for y, line in enumerate(board[:5]):
-        for x, c in enumerate(line[:5]):
+    for y, line in enumerate(board[:size]):
+        for x, c in enumerate(line[:size]):
             if c in COLMAP.keys():
 
                 # Find endpoint constraint of this color at this point
@@ -332,21 +335,30 @@ def load_board(board_file='boards/level1.txt'):
                         line_segment_propns_by_line_segment[ls], fill_by_point[loc1], fill_by_point[loc2]):
                     E.add_constraint(ls_propn >> (fill1_propn & fill2_propn))
 
-    return E, size, colors
+    T = E.compile()
+
+    return T, size, colors
+
+def example_theory():
+    '''For test.py'''
+    return load_board()[0]
 
 if __name__ == "__main__":
 
-    E, size, colors = load_board() if len(argv) < 2 else load_board(argv[1])
+    if len(argv) != 2:
+        print('USAGE: python3 run.py board_file')
+        exit(1)
+    T, size, colors = load_board(argv[1])
 
-    # Compile and solve the theory
-    T = E.compile()
+    # Solve the theory
     solved = T.solve()
 
-    # Size is 5 since we have restricted boards to 5x5
-    size = 5
-
     if solved is not None:
-        draw_board(size, solved)
+        output_name = os.path.basename(argv[1])
+        output_name = output_name[:output_name.find('.')]
+        output_name += '.ps'
+        output_path = os.path.join('completed', output_name)
+        draw_board(size, solved, output_path)
     else:
         print("No solution")
 
